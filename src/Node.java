@@ -89,8 +89,10 @@ public class Node {
             }
 			try { Thread.sleep(1000); } catch(InterruptedException e) {}
 			if(nodeID == 3) {
-				//broadcastMessage(outputStreams, messages[0]);
-				broadcastMessage(outputStreams, messages.get(0));
+				synchronized(mutex) {
+					//broadcastMessage(outputStreams, messages[0]);
+					broadcastMessage(outputStreams, messages.get(0));
+				}
 			}
 
             // Close all connections
@@ -125,10 +127,10 @@ public class Node {
                             for(int i = 0; i < waiting.size(); i++)
                                 if(nodeVectorClock.isDeliverable(waiting.get(i))) {
                                     System.out.println("\t\tMessage is now deliverable: M" + waiting.get(i).messageNumber + " from C" + waiting.get(i).senderID);
-									System.out.println("\t\tnodeVectorClock.clock[" + message.senderID + "]: " + nodeVectorClock.clock[message.senderID]);
-									System.out.println("\t\twaiting.get(i).vectorClock.clock[" + message.senderID + "]: " + waiting.get(i).vectorClock.clock[waiting.get(i).senderID]);
+									//System.out.println("\t\tnodeVectorClock.clock[" + waiting.get(i).senderID + "]: " + nodeVectorClock.clock[waiting.get(i).senderID]);
+									//System.out.println("\t\twaiting.get(i).vectorClock.clock[" + waiting.get(i).senderID + "]: " + waiting.get(i).vectorClock.clock[waiting.get(i).senderID]);
                                     //nodeVectorClock.clock[message.senderID] = Math.max(nodeVectorClock.clock[message.senderID], message.vectorClock.clock[message.senderID]);
-									nodeVectorClock.clock[message.senderID] = Math.max(nodeVectorClock.clock[waiting.get(i).senderID], waiting.get(i).vectorClock.clock[waiting.get(i).senderID]);
+									nodeVectorClock.clock[waiting.get(i).senderID] = Math.max(nodeVectorClock.clock[waiting.get(i).senderID], waiting.get(i).vectorClock.clock[waiting.get(i).senderID]);
                                     System.out.println("\t\tC" + nodeID + ": CLOCK UPDATED TO " + nodeVectorClock.toString());
                                     waiting.remove(i);
 									System.out.println("\tWaiting queue size: " + waiting.size());
@@ -156,7 +158,7 @@ public class Node {
     private static void broadcastMessage(List<ObjectOutputStream> outputStreams, Message message) {
         int i = 0;
         for (ObjectOutputStream outputStream : outputStreams) {
-            System.out.println("\tC" + nodeID + ": sending message to C" + listeners.get(i)); i++;
+            System.out.println("\tC" + nodeID + ": sending M" + message.senderID + " " + message.toString() + " to C" + listeners.get(i)); i++;
             try {
                 outputStream.writeObject(message);
                 outputStream.flush();
