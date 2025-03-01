@@ -138,7 +138,7 @@ public class Node {
                     //nodeVectorClock.clock[message.senderID]++;
                     System.out.println("From C" + message.senderID + ": M" + message.messageNumber + " " + message.toString());
                     if(nodeVectorClock.isDeliverable(message)) {
-                        System.out.println("\tDELIVERABLE");
+                        //System.out.println("\tDELIVERABLE");
                         nodeVectorClock.clock[message.senderID] = Math.max(nodeVectorClock.clock[message.senderID], message.vectorClock.clock[message.senderID]);
                         System.out.println("\tC" + nodeID + ": CLOCK UPDATED TO " + nodeVectorClock.toString());
 						System.out.println("\tWaiting queue size: " + waiting.size());

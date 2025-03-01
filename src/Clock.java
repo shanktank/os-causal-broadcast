@@ -12,6 +12,7 @@ public class Clock implements Serializable {
         //clock = new int[Node.TOTAL_PROCESSES];
         //clock = new int[] {0, 0, 0, 0};
     }
+	
     public Clock(int nodeID, int[] clock) {
         this.nodeID = nodeID;
         //this.clock = clock.clone();
@@ -36,6 +37,7 @@ public class Clock implements Serializable {
     public synchronized void increment(int index) {
         clock[index]++;
     }
+	
     public synchronized void merge(int[] messageClock) {
     //public void merge(Clock messageClock) {
         for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
@@ -46,14 +48,12 @@ public class Clock implements Serializable {
 
     public synchronized boolean isDeliverable(Message message) {
         //int[] mvc = Arrays.copyOf(message.vectorClock, message.vectorClock.length);
-		// TODO: hold on did this stand for myvectorclock or message vector clock
         int[] mvc = message.copyClock(); // TODO: Also copy our own clock for comparisons?
 		int sID = message.senderID;
 		int[] vc = copyClock();
 
         boolean deliverable = true;
         String notDeliverableComps = "";
-
         //System.out.print("\t       "); for (int i = 0; i < nodeID; i++) { System.out.print("  "); System.out.flush(); } System.out.println("▼");
         System.out.println("\tnode: " + toString() + " (" + nodeID + ")");
         //System.out.print("\t       "); System.out.flush();
@@ -67,10 +67,10 @@ public class Clock implements Serializable {
                 if (vc[i] < mvc[i]) {
                     deliverable = false;
                     //System.out.print("× ");
-                    notDeliverableComps += "x ";
+                    notDeliverableComps += " x  ";
                 } else {
                     //System.out.print("  ");
-                    notDeliverableComps += "  ";
+                    notDeliverableComps += "    ";
                 }
             } else {
                 //if (mvc[i] != vc[i] - 1) {
@@ -79,10 +79,10 @@ public class Clock implements Serializable {
                 //if (vc[i] + 1 < mvc[i]) {
                     deliverable = false;
                     //System.out.print("X ");
-                    notDeliverableComps += "X ";
+                    notDeliverableComps += " X  ";
                 } else {
                     //System.out.print("  ");
-                    notDeliverableComps += "  ";
+                    notDeliverableComps += "    ";
                 }
             }
         }
@@ -95,6 +95,7 @@ public class Clock implements Serializable {
 
     public synchronized String toString() {
         int[] vc = copyClock();
-        return "[" + vc[0] + "," + vc[1] + "," + vc[2] + "," + vc[3] + "]";
+		//return "[" + vc[0] + "," + vc[1] + "," + vc[2] + "," + vc[3] + "]";
+		return String.format("[%03d,%03d,%03d,%03d]", vc[0], vc[1], vc[2], vc[3]);
     }
 }
