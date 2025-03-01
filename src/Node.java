@@ -10,20 +10,27 @@ import java.util.concurrent.Executors;
 import java.util.Random;
 
 public class Node {
-    public static final String[] ADDRESSES = { "dc01", "dc02", "dc03", "dc04" };
+    private static final String[] ADDRESSES = { "dc01", "dc02", "dc03", "dc04" };
     //public static final String[] ADDRESSES = { "localhost", "localhost", "localhost", "localhost" };
-    public static final int PORT = 9000;
+    private static final int PORT = 9000;
 
     public static final int TOTAL_PROCESSES = 4;
     private static final ExecutorService executor = Executors.newFixedThreadPool(TOTAL_PROCESSES);
-    public static List<Integer> listeners = new ArrayList<>();
+    private static List<Integer> listeners = new ArrayList<>();
 
     private static int nodeID; // ID of this node (0 - 3)
     public static Clock nodeVectorClock = new Clock(-1); // Vector clock for this node
-    public static List<Message> waiting = new ArrayList<>(); // Messages held back from delivery
+    private static List<Message> waiting = new ArrayList<>(); // Messages held back from delivery
 
     private static final Object mutex = new Object();
     private static final Random random = new Random();
+	
+	private static final int MESSAGES_TO_SEND = 100;
+	private static final int MESSAGES_TO_RECEIVE = MESSAGES_TO_SEND * (TOTAL_PROCESSES - 1);
+	private static int messagesSent = 0;
+	private static int messagesReceived = 0;
+	private static int biggestQueue = 0;
+	private static int totalHeldBack = 0;
 
     public static void main(String[] args) {
         if (args.length != 1 || Integer.parseInt(args[0]) < 0 || Integer.parseInt(args[0]) >= TOTAL_PROCESSES) {
@@ -68,37 +75,48 @@ public class Node {
             }
 
 			//Message messages[] = {null, null};
-			List<Message> messages = new ArrayList<>();
-            for (int i = 0; i < 2; i++) {
-                try { Thread.sleep(random.nextInt(1000) + 500); } catch(InterruptedException e) {}
+			//List<Message> messages = new ArrayList<>();
+			while (messagesSent < MESSAGES_TO_SEND) {
+                try { Thread.sleep(random.nextInt(10) + 5); } catch(InterruptedException e) {}
                 synchronized(mutex) {
                     // Send a message to all other machines
                     nodeVectorClock.increment(nodeID); // Increment my own clock
-                    System.out.println("C" + nodeID + ": M" + (i+1) + " PREPARED, CLOCK UPDATED TO " + nodeVectorClock.toString());
+                    System.out.println("C" + nodeID + ": M" + (messagesSent+1) + " PREPARED, CLOCK UPDATED TO " + nodeVectorClock.toString());
                     //Message message = new Message(nodeID, i+1, nodeVectorClock.clock);
-                    //Message message = new Message(nodeID, i+1, nodeVectorClock.copy());
-					messages.add(new Message(nodeID, i+1, nodeVectorClock.copy()));
+                    Message message = new Message(nodeID, messagesSent+1, nodeVectorClock.copy());
+					broadcastMessage(outputStreams, message);
+					messagesSent++;
+					//messages.add(new Message(nodeID, i+1, nodeVectorClock.copy()));
                     //nodeVectorClock.clock.clone(); // ??
-                    if(!(nodeID == 3 && i == 0)) {
+                    //if(!(nodeID == 3 && i == 0)) {
 						//broadcastMessage(outputStreams, messages[i]);
-						broadcastMessage(outputStreams, messages.get(i));
-					} else {
-						try { Thread.sleep(1000); } catch(InterruptedException e) {}
-					}
+						//broadcastMessage(outputStreams, messages.get(i));
+					//} else {
+					//	try { Thread.sleep(1000); } catch(InterruptedException e) {}
+					//}
                 }
             }
-			try { Thread.sleep(1000); } catch(InterruptedException e) {}
+			/*try { Thread.sleep(1000); } catch(InterruptedException e) {}
 			if(nodeID == 3) {
 				synchronized(mutex) {
 					//broadcastMessage(outputStreams, messages[0]);
 					broadcastMessage(outputStreams, messages.get(0));
 				}
-			}
+			}*/
 
+			// TODO: probably gonna have to do this in a while loop and also make sure no thread handling sockets is still finishing up
             // Close all connections
-            // for (Socket s : sockets) {
-            //     s.close();
-            // }
+			//synchronized (mutex) {
+				//if (messagesSent == MESSAGES_TO_SEND && messagesReceived == MESSAGES_TO_SEND * (TOTAL_PROCESSES - 1)) {
+					//for (Socket s : sockets) s.close();
+				//}
+			//}
+			
+			try { Thread.sleep(250); } catch(InterruptedException e) {}
+			System.out.println("\nMessages sent: " + messagesSent);
+			System.out.println("Messages received: " + messagesReceived);
+			System.out.println("Biggest queue size: " + biggestQueue);
+			System.out.println("Total held back: " + totalHeldBack + "/" + MESSAGES_TO_RECEIVE);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -108,10 +126,14 @@ public class Node {
 
     private static void listenForMessages(Socket socket) {
         try (ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
-            while (true) {
+			int mr = 0;
+			//while (true) {
+			while (mr < MESSAGES_TO_RECEIVE) {
+            //while (messagesReceived < MESSAGES_TO_RECEIVE) {
                 Message message = (Message) inputStream.readObject();
                 // TODO: i think we don't increment index upon receive and only increment index upon deliver rather than full merge
                 synchronized(mutex) {
+					//messagesReceived++;
                     // TODO: increment clock before send or not?
                     //nodeVectorClock.clock[message.senderID]++;
                     System.out.println("From C" + message.senderID + ": M" + message.messageNumber + " " + message.toString());
@@ -142,13 +164,18 @@ public class Node {
                     } else {
                         System.out.println("\tNOT DELIVERABLE");
                         waiting.add(message);
+						totalHeldBack++;
+						if (waiting.size() > biggestQueue) biggestQueue = waiting.size();
 						System.out.println("\tWaiting queue size: " + waiting.size());
                     }
                     // TODO: figure out if need to full merge or only update at sender index
                     //nodeVectorClock.merge(message.vectorClock);
                     //nodeVectorClock.clock[message.senderID] = Math.max(nodeVectorClock.clock[message.senderID], message.vectorClock[message.senderID]);
                     //System.out.println("\tC" + nodeID + ": clock updated to " + nodeVectorClock.toString());
+					messagesReceived++;
+					//if (messagesReceived == MESSAGES_TO_RECEIVE) break;
                 }
+				mr++;
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
@@ -162,7 +189,7 @@ public class Node {
             try {
                 outputStream.writeObject(message);
                 outputStream.flush();
-                try { Thread.sleep(random.nextInt(1000) + 500); } catch (InterruptedException e) {e.printStackTrace();}
+                try { Thread.sleep(random.nextInt(10) + 5); } catch (InterruptedException e) {e.printStackTrace();}
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -171,7 +198,7 @@ public class Node {
 
     // Attempts to establish a connection, retrying if it is not ready yet.
     private static Socket connectToProcess(int otherID) throws IOException {
-        final int MAX_ATTEMPTS = 600;
+        final int MAX_ATTEMPTS = 6000;
         int attempts = 0;
         while (true) {
             try {
@@ -183,7 +210,7 @@ public class Node {
                     throw e;
                 }
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(10);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted while retrying connection");
