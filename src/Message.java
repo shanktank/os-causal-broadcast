@@ -11,12 +11,12 @@ public class Message implements Serializable {
     public Message(int senderID, int messageNumber, Clock vectorClock) {
         this.messageNumber = messageNumber;
         this.senderID = senderID;
-		this.vectorClock = vectorClock.copy();
+        this.vectorClock = vectorClock.copy();
     }
 
-	public synchronized int[] copyClock() {
-		return vectorClock.copyClock();
-	}
+    public synchronized int[] copyClock() {
+        return vectorClock.copyClock();
+    }
 
     public synchronized String toString() {
         return vectorClock.toString();

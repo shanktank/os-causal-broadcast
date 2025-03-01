@@ -10,7 +10,7 @@ public class Clock implements Serializable {
     public Clock(int nodeID) {
         this.nodeID = nodeID;
     }
-	
+
     public Clock(int nodeID, int[] clock) {
         this.nodeID = nodeID;
         this.clock = Arrays.copyOf(clock, clock.length);
@@ -27,7 +27,7 @@ public class Clock implements Serializable {
     public synchronized void increment(int index) {
         clock[index]++;
     }
-	
+
     public synchronized void merge(int[] messageClock) {
         for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
             clock[i] = Math.max(clock[i], messageClock[i]);
@@ -37,8 +37,8 @@ public class Clock implements Serializable {
 
     public synchronized boolean isDeliverable(Message message) {
         int[] mvc = message.copyClock(); // TODO: Also copy our own clock for comparisons?
-		int sID = message.senderID;
-		int[] vc = copyClock();
+        int sID = message.senderID;
+        int[] vc = copyClock();
 
         boolean deliverable = true;
         String notDeliverableComps = "";
@@ -61,7 +61,7 @@ public class Clock implements Serializable {
                 //if (mvc[i] != vc[i] - 1) {
                 //if (vc[i] - 1 < mvc[i]) {
                 if (vc[i] + 1 != mvc[i]) {
-                //if (vc[i] + 1 < mvc[i]) {
+                    //if (vc[i] + 1 < mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " X  ";
                 } else {
@@ -78,6 +78,6 @@ public class Clock implements Serializable {
 
     public synchronized String toString() {
         int[] vc = copyClock();
-		return String.format("[%03d,%03d,%03d,%03d]", vc[0], vc[1], vc[2], vc[3]);
+        return String.format("[%03d,%03d,%03d,%03d]", vc[0], vc[1], vc[2], vc[3]);
     }
 }
