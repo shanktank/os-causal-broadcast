@@ -11,7 +11,6 @@ public class Message implements Serializable {
     public Message(int senderID, int messageNumber, Clock vectorClock) {
         this.messageNumber = messageNumber;
         this.senderID = senderID;
-        //this.vectorClock = vectorClock;
 		this.vectorClock = vectorClock.copy();
     }
 

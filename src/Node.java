@@ -18,8 +18,8 @@ public class Node {
     private static final ExecutorService executor = Executors.newFixedThreadPool(TOTAL_PROCESSES);
     private static List<Integer> listeners = new ArrayList<>();
 
-    private static int nodeID; // ID of this node (0 - 3)
-    public static Clock nodeVectorClock = new Clock(-1); // Vector clock for this node
+    private static int nodeID;
+    public static Clock nodeVectorClock = new Clock(-1);
     private static List<Message> waiting = new ArrayList<>(); // Messages held back from delivery
 
     private static final Object mutex = new Object();
