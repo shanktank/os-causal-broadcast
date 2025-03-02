@@ -2,8 +2,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class Message implements Serializable {
-    //private static final long serialVersionUID = 1L;
-
     public int senderID;
     public int messageNumber;
     public Clock vectorClock;

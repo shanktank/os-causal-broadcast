@@ -2,8 +2,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class Clock implements Serializable {
-    //private static final long serialVersionUID = 1L;
-
     public int nodeID = -1;
     public int[] clock = new int[Node.TOTAL_PROCESSES];
 	
@@ -15,7 +13,8 @@ public class Clock implements Serializable {
 
     public Clock(int nodeID, int[] clock) {
         this.nodeID = nodeID;
-        this.clock = Arrays.copyOf(clock, clock.length);
+        //this.clock = Arrays.copyOf(clock, clock.length);
+		this.clock = clock;
     }
 
     public synchronized Clock copy() {
@@ -31,21 +30,16 @@ public class Clock implements Serializable {
     }
 
     public boolean isDeliverable(Message message) {
-        int[] mvc = message.copyClock(); // TODO: Also copy our own clock for comparisons?
+        int[] mvc = message.copyClock();
         int sID = message.senderID;
         int[] vc = copyClock();
 
         boolean deliverable = true;
         String notDeliverableComps = "";
-        //System.out.print("\t       "); for (int i = 0; i < nodeID; i++) { System.out.print("  "); System.out.flush(); } System.out.println("▼");
         System.out.println("\tnode: " + toString() + " (" + nodeID + ")");
         notDeliverableComps += "\t       ";
         for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
-            // TODO: check i vs nodeID, senderID vs nodeID, or i vs senderID?
-            //if (i != nodeID) {
-            //if (sID != nodeID) { // surely not this one
             if (i != sID) {
-                //if (mvc[i] > vc[i]) {
                 if (vc[i] < mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " x  ";
@@ -53,10 +47,7 @@ public class Clock implements Serializable {
                     notDeliverableComps += "    ";
                 }
             } else {
-                //if (mvc[i] != vc[i] - 1) {
-                //if (vc[i] - 1 < mvc[i]) {
                 if (vc[i] + 1 != mvc[i]) {
-                    //if (vc[i] + 1 < mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " X  ";
                 } else {
@@ -66,7 +57,6 @@ public class Clock implements Serializable {
         }
         if (!deliverable) System.out.println(notDeliverableComps);
         System.out.println("\tmesg: " + message.toString() + " (" + message.senderID + ")");
-        //System.out.print("\t       "); for (int i = 0; i < nodeID; i++) { System.out.print("  "); System.out.flush(); } System.out.println("▲");
 
         return deliverable;
     }
