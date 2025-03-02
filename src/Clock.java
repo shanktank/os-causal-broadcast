@@ -13,7 +13,6 @@ public class Clock implements Serializable {
 
     public Clock(int nodeID, int[] clock) {
         this.nodeID = nodeID;
-        //this.clock = Arrays.copyOf(clock, clock.length);
 		this.clock = clock;
     }
 
@@ -22,16 +21,20 @@ public class Clock implements Serializable {
     }
 
     public int[] copyClock() {
-        synchronized (mutex) { return Arrays.copyOf(clock, clock.length); }
+        synchronized (mutex) {
+			return Arrays.copyOf(clock, clock.length);
+		}
     }
 
-    public synchronized void increment(int index) {
-        synchronized (mutex) { clock[index]++; }
+    public synchronized Clock increment(int index) {
+        synchronized (mutex) {
+			clock[index]++;
+			return copy();
+		}
     }
 
     public boolean isDeliverable(Message message) {
         int[] mvc = message.copyClock();
-        int sID = message.senderID;
         int[] vc = copyClock();
 
         boolean deliverable = true;
@@ -39,15 +42,15 @@ public class Clock implements Serializable {
         System.out.println("\tnode: " + toString() + " (" + nodeID + ")");
         notDeliverableComps += "\t       ";
         for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
-            if (i != sID) {
-                if (vc[i] < mvc[i]) {
+            if (i != message.senderID) {
+                if (clock[i] < mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " x  ";
                 } else {
                     notDeliverableComps += "    ";
                 }
             } else {
-                if (vc[i] + 1 != mvc[i]) {
+                if (clock[i] + 1 != mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " X  ";
                 } else {
