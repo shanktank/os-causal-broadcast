@@ -6,6 +6,8 @@ public class Clock implements Serializable {
 
     public int nodeID = -1;
     public int[] clock = new int[Node.TOTAL_PROCESSES];
+	
+	private static final Object mutex = new Object();
 
     public Clock(int nodeID) {
         this.nodeID = nodeID;
@@ -20,22 +22,15 @@ public class Clock implements Serializable {
         return new Clock(nodeID, copyClock());
     }
 
-    public synchronized int[] copyClock() {
-        return Arrays.copyOf(clock, clock.length);
+    public int[] copyClock() {
+        synchronized (mutex) { return Arrays.copyOf(clock, clock.length); }
     }
 
     public synchronized void increment(int index) {
-        clock[index]++;
+        synchronized (mutex) { clock[index]++; }
     }
 
-    public synchronized void merge(int[] messageClock) {
-        for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
-            clock[i] = Math.max(clock[i], messageClock[i]);
-        }
-        System.out.println("\tClock merged to " + toString());
-    }
-
-    public synchronized boolean isDeliverable(Message message) {
+    public boolean isDeliverable(Message message) {
         int[] mvc = message.copyClock(); // TODO: Also copy our own clock for comparisons?
         int sID = message.senderID;
         int[] vc = copyClock();
@@ -76,7 +71,7 @@ public class Clock implements Serializable {
         return deliverable;
     }
 
-    public synchronized String toString() {
+    public String toString() {
         int[] vc = copyClock();
         return String.format("[%03d,%03d,%03d,%03d]", vc[0], vc[1], vc[2], vc[3]);
     }

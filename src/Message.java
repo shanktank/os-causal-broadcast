@@ -9,16 +9,16 @@ public class Message implements Serializable {
     public Clock vectorClock;
 
     public Message(int senderID, int messageNumber, Clock vectorClock) {
-        this.messageNumber = messageNumber;
         this.senderID = senderID;
+		this.messageNumber = messageNumber;
         this.vectorClock = vectorClock.copy();
     }
 
-    public synchronized int[] copyClock() {
+    public int[] copyClock() {
         return vectorClock.copyClock();
     }
 
-    public synchronized String toString() {
+    public String toString() {
         return vectorClock.toString();
     }
 }
