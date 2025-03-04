@@ -2,8 +2,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class Clock implements Serializable {
-    public int nodeID = -1;
-    public int[] clock = new int[Node.TOTAL_PROCESSES];
+    private int nodeID = -1;
+    private int[] clock = new int[Node.TOTAL_PROCESSES];
 	
 	private static final Object mutex = new Object();
 
@@ -16,16 +16,19 @@ public class Clock implements Serializable {
 		this.clock = clock;
     }
 
+	// Take copy of object for thread-safe use
     public synchronized Clock copy() {
         return new Clock(nodeID, copyClock());
     }
 
+	// Take copy of clock for thread-safe use
     public int[] copyClock() {
         synchronized (mutex) {
 			return Arrays.copyOf(clock, clock.length);
 		}
     }
 
+	// Increment the clock at the index of the sender when it's delivered
     public synchronized Clock increment(int index) {
         synchronized (mutex) {
 			clock[index]++;
@@ -33,16 +36,19 @@ public class Clock implements Serializable {
 		}
     }
 
+	// Check if a message satisfies the conditions:
+	//  Message clock == node clock + 1 at index of sender
+	//  Message clock < node clock for all other indices
+	// Also display and compare the clocks visually for confirmation
     public boolean isDeliverable(Message message) {
         int[] mvc = message.copyClock();
-        int[] vc = copyClock();
 
         boolean deliverable = true;
         String notDeliverableComps = "";
-        System.out.println("\tnode: " + toString() + " (" + nodeID + ")");
+        System.out.println("\tnode: " + toString() + " (C" + nodeID + ")");
         notDeliverableComps += "\t       ";
         for (int i = 0; i < Node.TOTAL_PROCESSES; i++) {
-            if (i != message.senderID) {
+            if (i != message.getSenderID()) {
                 if (clock[i] < mvc[i]) {
                     deliverable = false;
                     notDeliverableComps += " x  ";
@@ -59,7 +65,7 @@ public class Clock implements Serializable {
             }
         }
         if (!deliverable) System.out.println(notDeliverableComps);
-        System.out.println("\tmesg: " + message.toString() + " (" + message.senderID + ")");
+        System.out.println("\tmesg: " + message.toString() + " (C" + message.getSenderID() + ")");
 
         return deliverable;
     }

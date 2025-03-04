@@ -2,9 +2,9 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class Message implements Serializable {
-    public int senderID;
-    public int messageNumber;
-    public Clock vectorClock;
+    private int senderID;
+    private int messageNumber;
+    private Clock vectorClock;
 
     public Message(int senderID, int messageNumber, Clock vectorClock) {
         this.senderID = senderID;
@@ -12,9 +12,18 @@ public class Message implements Serializable {
         this.vectorClock = vectorClock.copy();
     }
 
+	// Take copy of clock for thread-safe use
     public int[] copyClock() {
         return vectorClock.copyClock();
     }
+	
+	public int getSenderID() {
+		return senderID;
+	}
+	
+	public int getMessageNumber() {
+		return messageNumber;
+	}
 
     public String toString() {
         return vectorClock.toString();

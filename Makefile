@@ -10,8 +10,7 @@ NODE_IDS = 0 1 2 3
 
 
 compile: $(SOURCE_FILES) $(TARGET_DIR)
-	javac -encoding UTF-8 -d $(TARGET_DIR) $(SOURCE_FILES)
-	#javac -encoding ISO-8859-1 -d $(TARGET_DIR) $(SOURCE_FILES)
+	javac -d $(TARGET_DIR) $(SOURCE_FILES)
 
 clean:
 	rm -f $(TARGET_FILES)

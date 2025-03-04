@@ -16,12 +16,11 @@ import java.util.concurrent.CountDownLatch;
 
 public class Node {
 	//public static final String[] ADDRESSES = { "localhost", "localhost", "localhost", "localhost" };
-    private static final String[] ADDRESSES = { "dc01", "dc02", "dc03", "dc04" };
+    private static final String[] ADDRESSES = { "dc01", "dc02", "dc03", "dc05" };
     private static final int PORT = 9000;
 
     public static final int TOTAL_PROCESSES = 4;
     private static final ExecutorService executor = Executors.newFixedThreadPool(TOTAL_PROCESSES);
-    private static final List<Integer> listeners = new ArrayList<>();
 
     private static int nodeID;
     public static Clock nodeVectorClock;
@@ -29,7 +28,7 @@ public class Node {
 	private static final List<Message> waiting = Collections.synchronizedList(new ArrayList<>()); // Messages held back from delivery
 	private static final List<Integer> orderDelivered = Collections.synchronizedList(new ArrayList<>());
 
-    private static final Object mutex = new Object();
+    private static final Object mutex = new Object(); // Mutex for thread critical sections
     private static final Random random = new Random();
 
     private static final int MESSAGES_TO_SEND = 100;
@@ -56,23 +55,22 @@ public class Node {
 
         System.out.println("C" + nodeID + ": starting...");
         try (ServerSocket serverSocket = new ServerSocket(PORT + nodeID)) {
-            // Connect out to all processes with ID < nodeID
+            // Connect out to all processes with otherID < nodeID
             for (int otherID = 0; otherID < nodeID; otherID++) {
                 Socket s = connectToProcess(otherID);
                 sockets.add(s);
-                listeners.add(otherID);
                 System.out.println("C" + nodeID + ": connected to C" + otherID);
             }
-
-            // Accept connections from processes with ID > nodeID
+			
+            // Accept connections from processes with otherID > nodeID
             int connectionsToAccept = TOTAL_PROCESSES - 1 - nodeID;
             for (int i = 0; i < connectionsToAccept; i++) {
                 Socket s = serverSocket.accept();
                 sockets.add(s);
-                listeners.add(i + nodeID + 1);
                 System.out.println("C" + nodeID + ": accepted connection.");
             }
 			
+			// Everyone's connected, now the actual work can begin
             System.out.println("C" + nodeID + ": all connections established.\n");
 			
 			// Object streams to handle our messages
@@ -91,14 +89,14 @@ public class Node {
                 try { Thread.sleep(100); } catch(InterruptedException e) {}
             for (Socket s : sockets) s.close();
 
-            System.out.println("\nMessages sent: " + messagesSent);
+			// Report results
+			System.out.println();
+            System.out.println("Messages sent: " + messagesSent);
             System.out.println("Messages received: " + messagesReceived);
             System.out.println("Messages delivered: " + messagesDelivered);
             System.out.println("Biggest queue size: " + biggestQueue);
             System.out.println("Total held back: " + totalHeldBack + "/" + MESSAGES_TO_RECEIVE_TOTAL);
-            //System.out.println("Order delivered: " + orderDelivered);
-        } catch (EOFException e) {
-            // Closed normally
+            System.out.println("Order delivered: " + orderDelivered);
         } catch (IOException e) {
             System.out.println("Exception in main: " + e.getMessage());
         } finally {
@@ -108,51 +106,45 @@ public class Node {
 
     private static void listenForMessages(ObjectInputStream inputStream) {
         try {
+			// Each thread will receive exactly 100 messages, after which it is finished and need no longer listen for more
 			for (int mr = 0; mr < MESSAGES_TO_RECEIVE_PER_THREAD; mr++) {
                 Message message = (Message) inputStream.readObject();
-                //if (message == null) break; // TODO: send null message to indicate session termination from one process to the others?
 				
-				Thread.sleep(random.nextInt(4) + 1);
+				Thread.sleep(random.nextInt(4) + 1); // Delay 1-5ms
 				
-                synchronized(mutex) {
-                    System.out.println("From C" + message.senderID + ": M" + message.messageNumber + " " + message.toString());
+                synchronized(mutex) { // Use mutex so only one thread can process a message at a time
+                    System.out.println("From C" + message.getSenderID() + ": M" + message.getMessageNumber() + " " + message.toString());
                     if(nodeVectorClock.isDeliverable(message)) {
-                        messagesDelivered++;
-                        orderDelivered.add(message.messageNumber);
-						nodeVectorClock.increment(message.senderID);
+						deliverMessage(message);
                         System.out.println("\tC" + nodeID + ": CLOCK UPDATED TO " + nodeVectorClock.toString());
 						
+						// If the message can be delivered, check the delayed list for other deliverable messages
                         boolean check;
                         do {
                             check = false;
                             for(int i = 0; i < waiting.size(); i++) {
                                 Message m = waiting.get(i);
-                                System.out.println("\tChecking undelivered: M" + m.messageNumber + " from C" + m.senderID);
+                                System.out.println("\tChecking undelivered: M" + m.getMessageNumber() + " from C" + m.getSenderID());
                                 if(nodeVectorClock.isDeliverable(m)) {
-                                    messagesDelivered++;
-                                    orderDelivered.add(m.messageNumber);
-                                    System.out.println("\t\tMessage is now deliverable: M" + m.messageNumber + " from C" + m.senderID);
-									nodeVectorClock.increment(m.senderID);
+									deliverMessage(m);
+									System.out.println("\t\tMessage is now deliverable: M" + m.getMessageNumber() + " from C" + m.getSenderID());
                                     System.out.println("\t\tC" + nodeID + ": CLOCK UPDATED TO " + nodeVectorClock.toString());
                                     waiting.remove(i);
+									System.out.println("\t\tWaiting queue size: " + waiting.size());
                                     check = true;
                                     break;
                                 }
                             }
                         } while(check);
                     } else {
-                        System.out.println("\tDELAYING DELIVERY");
-                        waiting.add(message);
-                        totalHeldBack++;
-                        if (waiting.size() > biggestQueue) biggestQueue = waiting.size();
-                        System.out.println("\tWaiting queue size: " + waiting.size());
+						// If a message isn't causally ready, add it to the delayed queue
+						delayDelivery(message);
+                        System.out.println("\tDelivery delayed. Waiting queue size: " + waiting.size());
                     }
 					
                     messagesReceived++;
                 }
             }            
-        } catch (EOFException e) {
-            // Closed normally
         } catch (IOException | InterruptedException | ClassNotFoundException e) {
             System.out.println("Exception in listenForMessages: " + e.getMessage());
         }
@@ -161,26 +153,35 @@ public class Node {
     private static void broadcastMessages(List<ObjectOutputStream> outputStreams) {
 		while (messagesSent < MESSAGES_TO_SEND) {
             try { Thread.sleep(random.nextInt(10)); } catch (InterruptedException e) {} // Sleep 0-9ms then broadcast
-            //synchronized (mutex) {
-                Clock copy = nodeVectorClock.increment(nodeID); // Use copy below for thread safety
-				Message message = new Message(nodeID, messagesSent + 1, copy);
-				System.out.println("C" + nodeID + ": M" + (messagesSent + 1) + " PREPARED. CLOCK UPDATED TO " + copy.toString() + ". BROADCASTING...");
-				for (ObjectOutputStream outputStream : outputStreams) { // Send a message to all other machines
-					try {
-						outputStream.writeObject(message);
-						outputStream.flush();
-					} catch (EOFException e) {
-						// Closed normally
-					} catch (IOException e) {
-						System.out.println("Exception in broadcastMessage: " + e.getMessage());
-					}
+			Clock copy = nodeVectorClock.increment(nodeID); // Use copy below for thread safety
+			Message message = new Message(nodeID, messagesSent + 1, copy);
+			System.out.println("C" + nodeID + ": M" + (messagesSent + 1) + " PREPARED. CLOCK UPDATED TO " + copy.toString() + ". BROADCASTING...");
+			for (ObjectOutputStream outputStream : outputStreams) { // Send a message to all other machines
+				try {
+					outputStream.writeObject(message);
+					outputStream.flush();
+				} catch (IOException e) {
+					System.out.println("Exception in broadcastMessage: " + e.getMessage());
 				}
-                messagesSent++;
-            //}
+			}
+			messagesSent++;
         }
     }
 
-    // Attempts to establish a connection, retrying if it is not ready yet.
+	private static synchronized void deliverMessage(Message message) {
+		messagesDelivered++;
+		orderDelivered.add(message.getMessageNumber());
+		nodeVectorClock.increment(message.getSenderID());
+	}
+	
+	// When a message is not causally ready, queue it for later delivery
+	private static synchronized void delayDelivery(Message message) {
+		waiting.add(message);
+		totalHeldBack++;
+		if (waiting.size() > biggestQueue) biggestQueue = waiting.size();
+	}
+
+    // Attempts to establish a connection, retrying if it is not ready yet
     private static Socket connectToProcess(int otherID) throws IOException {
         final int MAX_ATTEMPTS = 6000;
         int attempts = 0;
