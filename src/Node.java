@@ -27,6 +27,7 @@ public class Node {
 
 	private static final List<Message> waiting = Collections.synchronizedList(new ArrayList<>()); // Messages held back from delivery
 	private static final List<Integer> orderDelivered = Collections.synchronizedList(new ArrayList<>());
+	private static final List<Integer> orderDeliveredSender = Collections.synchronizedList(new ArrayList<>());
 
     private static final Object mutex = new Object(); // Mutex for thread critical sections
     private static final Random random = new Random();
@@ -96,7 +97,11 @@ public class Node {
             System.out.println("Messages delivered: " + messagesDelivered);
             System.out.println("Biggest queue size: " + biggestQueue);
             System.out.println("Total held back: " + totalHeldBack + "/" + MESSAGES_TO_RECEIVE_TOTAL);
-            System.out.println("Order delivered: " + orderDelivered);
+            System.out.print("Order delivered (Sender-Message): ");
+            for (int i = 0; i < orderDelivered.size(); i++)
+                System.out.print(orderDeliveredSender.get(i) + "-" + orderDelivered.get(i) + " ");
+            System.out.println();
+            //System.out.println("Order delivered: " + orderDelivered);
         } catch (IOException e) {
             System.out.println("Exception in main: " + e.getMessage());
         } finally {
@@ -171,6 +176,7 @@ public class Node {
 	private static synchronized void deliverMessage(Message message) {
 		messagesDelivered++;
 		orderDelivered.add(message.getMessageNumber());
+		orderDeliveredSender.add(message.getSenderID());
 		nodeVectorClock.increment(message.getSenderID());
 	}
 	
